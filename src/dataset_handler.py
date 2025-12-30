@@ -2,6 +2,7 @@ import os
 import torch
 import pickle
 import numpy as np
+import collections.abc
 
 from torchvision.datasets import CIFAR10, CIFAR100
 from torchvision import datasets
@@ -115,7 +116,7 @@ def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=No
     f_test = float(data_cfg["f_test"]) 
 
     # Tabular datasets will be dicts and need to be converted to dataset objects
-    if isinstance(dataset, dict):
+    if isinstance(dataset, collections.abc.Mapping):
         print(f"⏳-- Converting tabular data: {data_cfg['dataset']} to dataset")
         features = dataset['features']
         labels = dataset['labels']

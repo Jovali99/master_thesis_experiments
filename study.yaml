@@ -1,5 +1,5 @@
 study: # Configuration for training
-  study_name: "purchase100-resnet-baseline"
+  study_name: "purchase100-mlp3-baseline"
   trials: 50
   epochs: 50 # Integer number for indicating the epochs for training target model.
   batch_size: 128 # Integer number for indicating batch size for training the target model.
