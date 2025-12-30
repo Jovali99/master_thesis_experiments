@@ -1,5 +1,4 @@
 import os
-from tabular_handler import TabularInputHandler
 import torch
 import pickle
 import numpy as np
@@ -15,6 +14,7 @@ from tqdm import tqdm
 
 from src.dataclasses import CIFARDatasetStructure
 from src.cifar_handler import CifarInputHandler
+from src.tabular_handler import TabularInputHandler
 
 # Basic dataset class to handle weighted datsets
 class weightedDataset(Dataset):
@@ -116,6 +116,7 @@ def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=No
 
     # Tabular datasets will be dicts and need to be converted to dataset objects
     if isinstance(dataset, dict):
+        print(f"⏳-- Converting tabular data: {data_cfg['dataset']} to dataset")
         features = dataset['features']
         labels = dataset['labels']
         dataset = TabularInputHandler.TabularUserDataset(features, labels)
@@ -170,8 +171,7 @@ def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=No
     dataset_name = data_cfg["dataset"]
     dataset_root = data_cfg.get("root", data_cfg.get("data_dir"))
     file_path_pkl = os.path.join(dataset_root, dataset_name + ".pkl")
-    file_path_npz = os.path.join(dataset_root, dataset_name + ".npz")
-    if not os.path.isfile(file_path_pkl) and not os.path.isfile(file_path_npz):
+    if not os.path.isfile(file_path_pkl):
         saveDataset(dataset, file_path_pkl)
 
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
@@ -179,13 +179,17 @@ def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=No
 
     # --- Assertion checks ---
     sample_x, sample_y = train_dataset[0]
-    assert sample_x.shape == (3, 32, 32), f"Unexpected sample shape: {sample_x.shape}"
-    assert not torch.isnan(sample_x).any(), "NaNs found in normalized data"
-    assert not torch.isinf(sample_x).any(), "Infs found in normalized data"
-    if(data_cfg["dataset"] == "cifar10" or data_cfg["dataset"] == "cinic10"):
-        assert 0.0 <= sample_y < 10, f"Target out of range: {sample_y}"
-    elif(data_cfg["dataset"] == "cifar100"):
-        assert 0.0 <= sample_y < 100, f"Target out of range: {sample_y}"
+    if isinstance(dataset, TabularInputHandler.TabularUserDataset):
+        assert sample_x.dim() == 1, f"Expected 1D feature vector, got {sample_x.shape}"
+        assert sample_y.shape == () or sample_y.dim() == 0, f"Unexpected label shape: {sample_y.shape}"
+    elif isinstance(dataset, CifarInputHandler.UserDataset):
+        assert sample_x.shape == (3, 32, 32), f"Unexpected sample shape: {sample_x.shape}"
+        assert not torch.isnan(sample_x).any(), "NaNs found in normalized data"
+        assert not torch.isinf(sample_x).any(), "Infs found in normalized data"
+        if(data_cfg["dataset"] == "cifar10" or data_cfg["dataset"] == "cinic10"):
+            assert 0.0 <= sample_y < 10, f"Target out of range: {sample_y}"
+        elif(data_cfg["dataset"] == "cifar100"):
+            assert 0.0 <= sample_y < 100, f"Target out of range: {sample_y}"
 
     print(f"✅ Dataset ready | Train: {len(train_dataset)} | Test: {len(test_dataset)}")
     return train_dataset, test_dataset, train_indices, test_indices
@@ -310,8 +314,8 @@ def load_cinic(root="data/cinic10"):
 
 def load_purchase():
     dataset = np.load(os.path.join("data", "purchase100.npz"))
-    print(f"Shape of features: {dataset['features']}")
-    print(f"Shape of labels: {dataset['labels']}")
+    print(f"Shape of features: {dataset['features'].shape}")
+    print(f"Shape of labels: {dataset['labels'].shape}")
     return dataset
 
 def load_texas():

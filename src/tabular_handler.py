@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "LeakPro")))
 from leakpro import AbstractInputHandler
 from leakpro.schemas import TrainingOutput, EvalOutput
 
-class TabularInputHandler(AbstractInputHandler)
+class TabularInputHandler(AbstractInputHandler):
     """Class to handle the user input for the CIFAR structured datasets."""
 
     def train(
@@ -176,20 +176,25 @@ class TabularInputHandler(AbstractInputHandler)
         return EvalOutput(**output_dict)
 
     class TabularUserDataset(AbstractInputHandler.UserDataset):
-        def __init__(self, data, targets, normalize=True, mean=None, std=None):
+        def __init__(self, data, targets, normalize=True, one_hot=False, mean=None, std=None):
             """
             Args:
                 data (Tensor): Tabular data of shape (N, D)
-                targets (Tensor): Labels of shape (N,)
+                targets (Tensor): Labels of shape (N,) or (N, num_classes) if one-hot
                 normalize (bool): Whether to apply feature-wise normalization
+                one_hot (bool): Whether to keep targets as one-hot vectors
                 mean, std (Tensor, optional): Precomputed normalization stats
             """
             assert data.shape[0] == targets.shape[0], "Data and targets must have the same length"
             assert data.dim() == 2, "Tabular data must be of shape (N, D)"
 
             self.data = data.float()  # Ensure float type
-            self.targets = targets
             self.normalize = normalize
+
+            if one_hot:
+                self.targets = targets.float()
+            else:
+                self.targets = targets.argmax(dim=1).long()
 
             if normalize:
                 if mean is None or std is None:
