@@ -57,25 +57,35 @@ def run_optimization(config, gpu_id, trials, save_path, hash_id, fbd_args: FbdAr
     shadow_inmask = fbd_args.shadow_inmask
     target_inmask = fbd_args.target_inmask
     tauc_ref = fbd_args.tauc_ref
+
+    def safe_obj(trial):
+        try:
+            return sh.fbd_objective(trial, config, rmia_scores, train_dataset, 
+                                                  test_dataset, shadow_gtl_probs, shadow_inmask, 
+                                                  target_inmask, tauc_ref, save_path, device)
+        except (optuna.exceptions.StorageInternalError, RuntimeError, OSError, ValueError) as e:
+            print(f"[Optuna][GPU {gpu_id}] Trial {trial.number} failed safely: {e}")
+            raise optuna.exceptions.TrialPruned()
     
-    func = lambda trial: sh.fbd_objective(trial, config, rmia_scores, train_dataset, 
-                                          test_dataset, shadow_gtl_probs, shadow_inmask, 
-                                          target_inmask, tauc_ref, save_path, device)
-    
-    study.optimize(func, n_trials=trials)
+    study.optimize(safe_obj, n_trials=trials)
     
     print(f"Study '{study_cfg['study_name']}' completed on GPU {gpu_id}.")
     df = study.trials_dataframe() 
     df.to_csv(os.path.join(save_path, f"results_gpu_{gpu_id}.csv"), index=False) 
     print(f"📄 Results saved to {os.path.join(save_path, f'results_gpu_{gpu_id}.csv')}")
 
-def parallell_optimization(config, labels, fbd_args):
+def parallell_optimization(config, labels, fbd_args, study_hash: str | None = None):
     study_cfg = config['fbd_study']
     gpu_ids = study_cfg["gpu_ids"]
     print(f"Starting parallell optimization using the following gpu ids: {gpu_ids}")
 
-    metadata = sl.buildStudyMetadata(study_cfg, config['data']) 
-    hash_id, save_path = sl.saveStudy(metadata, savePath=study_cfg['root'], labels=labels)
+    if study_hash is not None:
+        hash_id = study_hash  # Enter the hash of the 
+        study_name = f"{study_cfg['study_name']}-{hash_id}"
+        save_path = os.path.join("study", study_name)
+    else:
+        metadata = sl.buildStudyMetadata(study_cfg, config['data']) 
+        hash_id, save_path = sl.saveStudy(metadata, savePath=study_cfg['root'], labels=labels)
     
     # split up the trials among the gpus
     total_trials = study_cfg["trials"]
@@ -87,7 +97,7 @@ def parallell_optimization(config, labels, fbd_args):
 
     processes = []
     for gpu_id, trials in zip(gpu_ids, trials_per_gpu):
-        print("Running {trials} on gpu: {gpu_id}")
+        print(f"Running {trials} on gpu: {gpu_id}")
         p = multiprocessing.Process(
             target=run_optimization,
             args=(config, gpu_id, trials, save_path, hash_id, fbd_args)

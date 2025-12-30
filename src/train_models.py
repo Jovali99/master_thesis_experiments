@@ -222,7 +222,7 @@ def train_shadow_model(train_cfg, train_dataset, test_dataset, train_indices, te
                             path=os.path.join("processed_shadow_models", target_folder))
         
 
-def create_shadow_models_parallel(train_config, audit_config, gpu_ids, full_dataset, target_folder, train_missing: bool = False, missing_indices: list = []):
+def create_shadow_models_parallel(train_config, sm_count, gpu_ids, full_dataset, target_folder, train_missing: bool = False, missing_indices: list = []):
     n_gpus = len(gpu_ids)
     
     path = os.path.join("processed_shadow_models", target_folder)
@@ -232,7 +232,7 @@ def create_shadow_models_parallel(train_config, audit_config, gpu_ids, full_data
 
     # Create a list of balanced dataset_indices per shadow_model
     if not train_missing:
-        num_shadow_models = audit_config["audit"]["attack_list"][0]["num_shadow_models"]
+        num_shadow_models = sm_count
         model_indices_per_gpu = [[] for _ in range(n_gpus)]
         for idx in range(num_shadow_models):
             gpu = idx % n_gpus

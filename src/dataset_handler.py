@@ -1,4 +1,5 @@
 import os
+from tabular_handler import TabularInputHandler
 import torch
 import pickle
 import numpy as np
@@ -63,8 +64,19 @@ def loadDataset(data_cfg):
         print("⏩ Loading CIFAR-100")
         trainset = CIFAR100(root=root, train=True, download=True, transform=transform)
         testset = CIFAR100(root=root, train=False, download=True, transform=transform)
+    elif(dataset_name == "purchase100"):
+        print("⏩ Loading purchase100")
+        full_dataset = load_purchase()
+        return None, None, full_dataset
+    elif(dataset_name == "texas100"):
+        print("⏩ Loading texas100")
+        full_dataset = load_texas()
+        return None, None, full_dataset
+    elif(dataset_name == "location"):
+        print("⏩ Loading location")
+        full_dataset = load_location()
+        return None, None, full_dataset
     else:
-
         raise ValueError(f"Unsupported dataset: {dataset_name}")
 
     assert trainset != None, "Failed loading the train set"
@@ -101,6 +113,12 @@ def splitDataset(dataset, train_frac, test_frac):
 def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=None):
     f_train = float(data_cfg["f_train"])
     f_test = float(data_cfg["f_test"]) 
+
+    # Tabular datasets will be dicts and need to be converted to dataset objects
+    if isinstance(dataset, dict):
+        features = dataset['features']
+        labels = dataset['labels']
+        dataset = TabularInputHandler.TabularUserDataset(features, labels)
 
     if dataset is None:
         print("-- Processing dataset for training --")
@@ -151,8 +169,10 @@ def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=No
     # Save dataset
     dataset_name = data_cfg["dataset"]
     dataset_root = data_cfg.get("root", data_cfg.get("data_dir"))
-    file_path = os.path.join(dataset_root, dataset_name + ".pkl")
-    saveDataset(dataset, file_path)
+    file_path_pkl = os.path.join(dataset_root, dataset_name + ".pkl")
+    file_path_npz = os.path.join(dataset_root, dataset_name + ".npz")
+    if not os.path.isfile(file_path_pkl) and not os.path.isfile(file_path_npz):
+        saveDataset(dataset, file_path_pkl)
 
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
     test_dataset = torch.utils.data.Subset(dataset, test_indices)
@@ -287,3 +307,19 @@ def load_cinic(root="data/cinic10"):
     testset  = CIFARDatasetStructure(test_data, test_targets)
 
     return trainset, testset
+
+def load_purchase():
+    dataset = np.load(os.path.join("data", "purchase100.npz"))
+    print(f"Shape of features: {dataset['features']}")
+    print(f"Shape of labels: {dataset['labels']}")
+    return dataset
+
+def load_texas():
+    print("❌ Loading of dataset: Texas100 is not implemented")
+    dataset = np.load(os.path.join("data", "texas100.npz"))
+    return dataset
+
+def load_location():
+    print("❌ Loading of dataset: Location is not implemented")
+    dataset = np.load(os.path.join("data", "texas100.npz"))
+    return dataset

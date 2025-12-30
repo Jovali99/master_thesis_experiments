@@ -42,30 +42,39 @@ class TabularInputHandler(AbstractInputHandler)
             model.train()
             train_acc, train_loss, total_samples = 0.0, 0.0, 0
 
-            for data, target in dataloader:
-                target = target.float().unsqueeze(1)
-                data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
+            for inputs, labels in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}", leave=False, position=1):
+                #target = target.float().unsqueeze(1) # Used with BCE loss criterion and binary classification
+                #data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
+
+                labels = labels.long()
+                inputs, labels = inputs.to(device, non_blocking=True), labels.to(device, non_blocking=True)
 
                 optimizer.zero_grad()
-                output = model(data)
-                loss = criterion(output, target)
-
-                pred = output >= 0.5
-                train_acc += pred.eq(target).sum().item()
-
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                pred = outputs.argmax(dim=1) 
                 loss.backward()
                 optimizer.step()
-                train_loss += loss.item() 
-                total_samples += target.size(0)
 
-        train_acc = train_acc/len(dataloader.dataset)
-        train_loss = train_loss/len(dataloader)
+                #pred = output >= 0.5   # Binary classification
 
+                # Accumulate performance of shadow model
+                train_acc += pred.eq(labels.view_as(pred)).sum().item()
+                total_samples += labels.size(0)
+                train_loss += loss.item() * labels.size(0)
 
-        output_dict = {"model": model, "metrics": {"accuracy": train_acc, "loss": train_loss}}
-        output = TrainingOutput(**output_dict)
+            avg_train_loss = train_loss / total_samples
+            train_accuracy = train_acc / total_samples 
 
-        return output
+            accuracy_history.append(train_accuracy) 
+            loss_history.append(avg_train_loss)
+
+            print(f"Epoch {epoch+1} completed. Train Acc: {train_accuracy:.4f}, Train Loss: {avg_train_loss:.4f}")
+
+        results = EvalOutput(accuracy = train_accuracy,
+                             loss = avg_train_loss,
+                             extra = {"accuracy_history": accuracy_history, "loss_history": loss_history})
+        return TrainingOutput(model = model, metrics=results)
 
     def trainStudyFbD(
         self,
@@ -166,67 +175,41 @@ class TabularInputHandler(AbstractInputHandler)
         output_dict = {"accuracy": acc, "loss": loss}
         return EvalOutput(**output_dict)
 
-    class UserDataset(AbstractInputHandler.UserDataset):
-        def __init__(self, data, targets, augment: bool = False, **kwargs):
+    class TabularUserDataset(AbstractInputHandler.UserDataset):
+        def __init__(self, data, targets, normalize=True, mean=None, std=None):
             """
             Args:
-                data (Tensor): Image data of shape (N, H, W, C) or (N, C, H, W)
-                               Expected to be in range [0,1] (normalized).
-                targets (Tensor): Corresponding labels.
-                mean (Tensor, optional): Precomputed mean for normalization.
-                std (Tensor, optional): Precomputed std for normalization.
+                data (Tensor): Tabular data of shape (N, D)
+                targets (Tensor): Labels of shape (N,)
+                normalize (bool): Whether to apply feature-wise normalization
+                mean, std (Tensor, optional): Precomputed normalization stats
             """
             assert data.shape[0] == targets.shape[0], "Data and targets must have the same length"
-            assert data.max() <= 1.0 and data.min() >= 0.0, "Data should be in range [0,1]"
+            assert data.dim() == 2, "Tabular data must be of shape (N, D)"
 
             self.data = data.float()  # Ensure float type
             self.targets = targets
-            self.augment = augment
+            self.normalize = normalize
 
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-                
-            if not hasattr(self, "mean") or not hasattr(self, "std"):
-                # Reshape to (C, 1, 1) for broadcasting
-                self.mean = self.data.mean(dim=(0, 2, 3)).view(-1, 1, 1)
-                self.std = self.data.std(dim=(0, 2, 3)).view(-1, 1, 1)
-
-            if not hasattr(self, "augment"):
-                self.augment = False
-
-            self.augment_transforms = T.Compose([
-                T.RandomHorizontalFlip(p=0.5),
-                T.RandomCrop(32, padding=4)
-            ])
+            if normalize:
+                if mean is None or std is None:
+                    self.mean = self.data.mean(dim=0)
+                    self.std = self.data.std(dim=0).clamp(min=1e-8)
+                else:
+                    self.mean = mean
+                    self.std = std
 
         def transform(self, x):
             """Normalize using stored mean and std."""
-            return (x - self.mean) / self.std 
+            if self.normalize:
+                return (x - self.mean) / self.std 
+            return x
 
         def __getitem__(self, index):
             x = self.data[index]
             y = self.targets[index]
-
-            # Horizontal flip
-            if self.augment:
-                x = self.augment_transforms(x)
-
             x = self.transform(x)
-
             return x, y
 
         def __len__(self):
             return len(self.targets)
-
-        def __setstate__(self, state):
-            self.__dict__.update(state)
-            if not hasattr(self, "augment"):
-                self.augment = False
-            if not hasattr(self, "augment_transforms"):
-                self.augment_transforms = T.Compose([
-                    T.RandomHorizontalFlip(p=0.5),
-                    T.RandomCrop(32, padding=4)
-                ])
-
-        def set_augment(self, augment: bool):
-            self.augment = augment

@@ -413,8 +413,6 @@ def loadShadowModelSignals(target_name: str, load_dict: dict = None, path: str =
 
     return sm_logits, sm_resc_logits, sm_gtl_probs, sm_in_masks, sm_metadata, missing_indices
 
-
-
 def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logits: bool = True, start_index: int = 0):
     """
     Load FBD study output files from the study/<study_name>/trial_outputs directory.
@@ -441,62 +439,64 @@ def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logit
     else:
         global_metadata = None
 
+    meta_files = sorted(f for f in os.listdir(meta_dir) if f.startswith("metadata_") and f.endswith(".json"))
+    meta_indices = [int(f.split("_")[1].split(".")[0]) for f in meta_files]
+
     fbd_trial_results = []
     gtl_list = []
     logits_list = []
-    
-    index = start_index
 
-    while True:
-        loaded_any = False  # Detect if this index has any valid file
-        # --- Metadata ---
+    for idx in meta_indices:
+        # Load metadata
         if metadata:
-            meta_path = os.path.join(meta_dir, f"metadata_{index}.json")
-            if os.path.isfile(meta_path):
-                loaded_any = True
-                with open(meta_path, "r") as f:
-                    meta_dict = json.load(f)
-                
-                # Convert into dataclass
-                fbd_trial_results.append(
-                    FbdTrialResults(
-                        accuracy     = meta_dict["accuracy"],
-                        noise        = meta_dict["noise"],
-                        centrality   = meta_dict["centrality"],
-                        temperature  = meta_dict["temperature"],
-                        tau          = meta_dict["tau@0.1"]
-                    )
-                )
-            else:
-                if index > 0:
-                    break
-        # --- GTL probabilities ---
+            meta_path = os.path.join(meta_dir, f"metadata_{idx}.json")
+            if not os.path.isfile(meta_path):
+                print(f"[Warning] Missing metadata file: {meta_path}, skipping trial {idx}")
+                continue
+            with open(meta_path, "r") as f:
+                meta_dict = json.load(f)
+            trial_result = FbdTrialResults(
+                accuracy     = meta_dict["accuracy"],
+                noise        = meta_dict["noise"],
+                centrality   = meta_dict["centrality"],
+                temperature  = meta_dict["temperature"],
+                tau          = meta_dict["tau@0.1"]
+            )
+        else:
+            trial_result = None
+
+        # Load GTL
         if gtl:
-            gtl_path = os.path.join(gtl_dir, f"gtl_probabilities_{index}.npy")
-            if os.path.isfile(gtl_path):
-                loaded_any = True
-                gtl_list.append(np.load(gtl_path))
-            elif os.path.isdir(gtl_dir) and index == 0:
-                pass
-            elif os.path.isdir(gtl_dir):
-                break
-        # --- Rescaled logits ---
+            gtl_path = os.path.join(gtl_dir, f"gtl_probabilities_{idx}.npy")
+            if not os.path.isfile(gtl_path):
+                print(f"[Warning] Missing GTL file: {gtl_path}, skipping trial {idx}")
+                continue
+            gtl_data = np.load(gtl_path)
+        else:
+            gtl_data = None
+
+        # Load logits
         if logits:
-            logits_path = os.path.join(logits_dir, f"rescaled_logits_{index}.npy")
-            if os.path.isfile(logits_path):
-                loaded_any = True
-                logits_list.append(np.load(logits_path))
-            elif os.path.isdir(logits_dir) and index == 0:
-                pass
-            elif os.path.isdir(logits_dir):
-                break
+            logits_path = os.path.join(logits_dir, f"rescaled_logits_{idx}.npy")
+            if not os.path.isfile(logits_path):
+                print(f"[Warning] Missing logits file: {logits_path}, skipping trial {idx}")
+                continue
+            logits_data = np.load(logits_path)
+        else:
+            logits_data = None
 
-        if not loaded_any:
-            break  # No files found for this index → finished
+        # Only append if all requested data is available
+        if (metadata and trial_result is None) or (gtl and gtl_data is None) or (logits and logits_data is None):
+            continue
 
-        index += 1
+        if metadata:
+            fbd_trial_results.append(trial_result)
+        if gtl:
+            gtl_list.append(gtl_data)
+        if logits:
+            logits_list.append(logits_data)
 
-    print(f"✅ FbD study trial outputs loaded, amount: {index}")
+    print(f"✅ Loaded {len(fbd_trial_results)} trials for study '{study_name}'")
     return global_metadata, fbd_trial_results, gtl_list, logits_list, labels
 
 def loadAudit(audit_signals_name: str, save_path: str = "audit_signals"):
