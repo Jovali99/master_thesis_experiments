@@ -185,6 +185,11 @@ class TabularInputHandler(AbstractInputHandler):
                 one_hot (bool): Whether to keep targets as one-hot vectors
                 mean, std (Tensor, optional): Precomputed normalization stats
             """
+            if not isinstance(data, torch.Tensor):
+                data = torch.tensor(data, dtype=torch.float32)
+            if not isinstance(targets, torch.Tensor):
+                targets = torch.tensor(targets)
+
             assert data.shape[0] == targets.shape[0], "Data and targets must have the same length"
             assert data.dim() == 2, "Tabular data must be of shape (N, D)"
 
