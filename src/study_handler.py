@@ -1,4 +1,4 @@
-from models.mlp_model import MLP3, MLP4
+from src.models.mlp_model import MLP3, MLP4
 from src.cifar_handler import CifarInputHandler
 from src.dataset_handler import get_dataloaders, get_weighted_dataloaders
 from src.models.resnet18_model import ResNet18
