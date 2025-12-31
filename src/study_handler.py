@@ -5,7 +5,7 @@ from src.models.resnet18_model import ResNet18
 from src.models.wideresnet28_model import WideResNet
 from src.utils import sigmoid_weigths, calculate_logits, rescale_logits, calculate_tauc
 from src.save_load import saveTrial, buildTrialMetadata, buildStudyMetadata, saveStudy
-from tabular_handler import TabularInputHandler
+from src.tabular_handler import TabularInputHandler
 from torch import nn, optim
 from LeakPro.leakpro.attacks.mia_attacks.rmia import rmia_get_gtlprobs, rmia_vectorised
 from tqdm import tqdm
