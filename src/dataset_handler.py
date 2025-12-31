@@ -117,7 +117,7 @@ def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=No
 
     # Tabular datasets will be dicts and need to be converted to dataset objects
     if isinstance(dataset, collections.abc.Mapping):
-        print(f"⏳-- Converting tabular data: {data_cfg['dataset']} to dataset")
+        print(f"⏳Converting tabular data: {data_cfg['dataset']} to dataset")
         features = dataset['features']
         labels = dataset['labels']
         dataset = TabularInputHandler.TabularUserDataset(features, labels)
