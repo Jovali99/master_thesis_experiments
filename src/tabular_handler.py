@@ -23,6 +23,7 @@ class TabularInputHandler(AbstractInputHandler):
         criterion: torch.nn.Module = None,
         optimizer: optim.Optimizer = None,
         epochs: int | None = None,
+        scheduler: torch.optim.lr_scheduler._LRScheduler = None,
         device = None
         ) -> TrainingOutput:
         """Model training procedure."""
@@ -68,6 +69,10 @@ class TabularInputHandler(AbstractInputHandler):
 
             accuracy_history.append(train_accuracy) 
             loss_history.append(avg_train_loss)
+
+            # Apply the step scheduler
+            if scheduler is not None:
+                scheduler.step()
 
             print(f"Epoch {epoch+1} completed. Train Acc: {train_accuracy:.4f}, Train Loss: {avg_train_loss:.4f}")
 

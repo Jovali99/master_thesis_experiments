@@ -1,4 +1,6 @@
+from src.models.mlp_model import MLP3, MLP4
 import numpy as np
+from src.tabular_handler import TabularInputHandler
 import torch
 import torch.nn.functional as F
 import torchvision
@@ -19,21 +21,30 @@ from src.dataset_handler import get_dataloaders, process_dataset_by_indices, bui
 
 def trainTargetModel(cfg, train_loader, test_loader, train_indices, test_indices, save_dir):
     os.makedirs("target", exist_ok=True)
+    dataset_name = cfg["data"]["dataset"]
 
-    if(cfg["data"]["dataset"] == "cifar10" or cfg["data"]["dataset"] == "cinic10"):
+    if(dataset_name == "cifar10" or dataset_name == "cinic10"):
         num_classes = 10
-    elif(cfg["data"]["dataset"] == "cifar100"):
+    elif(dataset_name == "cifar100" or dataset_name == "purchase100" or dataset_name == "texas100"):
         num_classes = 100
     else:
-        raise ValueError(f"Incorrect dataset {cfg['data']['dataset']}, should be cifar10, cifar 100 or cinic10")
+        raise ValueError(f"Invalid dataset {dataset_name}, ")
 
-    if cfg["train"]["model"] == "resnet":
+    model_name = cfg["train"]["model"]
+    if model_name == "resnet":
         model = ResNet18(num_classes=num_classes)
-    elif cfg["train"]["model"] == "wideresnet":
+    elif model_name == "wideresnet":
         drop_rate = cfg["train"]["drop_rate"]
         model = WideResNet(depth=28, num_classes=num_classes, widen_factor=10, dropRate=drop_rate)
+    elif model_name == "mlp3":
+        input_dim = train_loader.dataset.dataset.data.shape[1]
+        model = MLP3(input_dim=input_dim, num_classes=num_classes)
+    elif model_name == "mlp4":
+        input_dim = train_loader.dataset.dataset.data.shape[1]
+        drop_rate = cfg["train"]["drop_rate"]
+        model = MLP4(input_dim=input_dim, num_classes=num_classes, dropout=drop_rate)
 
-    print(f"====== Training model: {cfg['train']['model']} on dataset: {cfg['data']['dataset']} ======")
+    print(f"====== Training model: {model_name} on dataset: {dataset_name} ======")
 
     """Parse training configuration"""
     lr = cfg["train"]["learning_rate"]
@@ -43,29 +54,36 @@ def trainTargetModel(cfg, train_loader, test_loader, train_indices, test_indices
     t_max = cfg["train"]["t_max"]
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
+    print(f"Using optimizer: {cfg["train"]["optimizer"]}")
+    if cfg["train"]["optimizer"] == "SGD":
+        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     # --- Initialize scheduler ---
     if t_max is not None:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
     else:
         scheduler = None
-    
-    augment = cfg["data"]["augment"]
-    if augment:
-        train_loader.dataset.dataset.augment = True
 
-    train_result = CifarInputHandler().train(dataloader=train_loader,
-                                             model=model,
-                                             criterion=criterion,
-                                             optimizer=optimizer,
-                                             epochs=epochs,
-                                             scheduler=scheduler)
+    if model_name == "resnet" or model_name ==  "wideresnet":
+        train_result = CifarInputHandler().train(dataloader=train_loader,
+                                                 model=model,
+                                                 criterion=criterion,
+                                                 optimizer=optimizer,
+                                                 epochs=epochs,
+                                                 scheduler=scheduler)
 
-    if augment:
-        train_loader.dataset.dataset.augment = False
+        test_result = CifarInputHandler().eval(test_loader, model, criterion)
+    else:
+        train_result = TabularInputHandler().train(dataloader=train_loader,
+                                                 model=model,
+                                                 criterion=criterion,
+                                                 optimizer=optimizer,
+                                                 epochs=epochs,
+                                                 scheduler=scheduler)
 
-    test_result = CifarInputHandler().eval(test_loader, model, criterion)
+        test_result = TabularInputHandler().eval(test_loader, model, criterion)
 
     model.to("cpu")
     save(model.state_dict(), os.path.join(save_dir, "target_model.pkl"))
@@ -79,7 +97,7 @@ def trainTargetModel(cfg, train_loader, test_loader, train_indices, test_indices
                                       epochs = epochs,
                                       train_indices = train_indices,
                                       test_indices = test_indices,
-                                      dataset_name = cfg["data"]["dataset"])
+                                      dataset_name = dataset_name)
     metadata_pkl_path = os.path.join(save_dir, "model_metadata.pkl")
     with open(metadata_pkl_path, "wb") as f:
         pickle.dump(meta_data, f)
