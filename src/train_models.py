@@ -54,7 +54,7 @@ def trainTargetModel(cfg, train_loader, test_loader, train_indices, test_indices
     t_max = cfg["train"]["t_max"]
 
     criterion = nn.CrossEntropyLoss()
-    print(f"Using optimizer: {cfg["train"]["optimizer"]}")
+    print(f"Using optimizer: {cfg['train']['optimizer']}")
     if cfg["train"]["optimizer"] == "SGD":
         optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
     else:
