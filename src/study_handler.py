@@ -82,7 +82,7 @@ def objective(trial, config, device):
         raise ValueError(f"Invalid model selection{config['train']['model']}")
 
     # --------- Optimizer setup ---------
-    optimizer_name = config['study']['optimizer']
+    optimizer_name = config['train']['optimizer']
         
     if config['study']['model'] == "mlp3" or config['study']['model'] == "mlp4":
         optimizer_name = trial.suggest_categorical("optimizer", ["SGD", "Adam"])

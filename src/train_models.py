@@ -179,40 +179,47 @@ def train_shadow_model(train_cfg, train_dataset, test_dataset, train_indices, te
     t_max = train_cfg["train"]["t_max"]
     batch_size = train_cfg["train"]["batch_size"]
 
-    if train_cfg["data"]["dataset"] == "cifar10" or train_cfg["data"]["dataset"] == "cinic10":
+    ds_name = train_cfg["data"]["dataset"]
+    if ds_name in ["cifar10", "cinic10"]:
         n_classes = 10
-    elif train_cfg["data"]["dataset"] == "cifar100":
+    elif ds_name in ["cifar100", "purchase100"]:
         n_classes = 100
     else:
         raise ValueError(f"Incorrect dataset {train_cfg['data']['dataset']}")
 
-    if train_cfg["train"]["model"] == "resnet":
+    m_name = train_cfg["train"]["model"]
+    if m_name == "resnet":
         model = torchvision.models.resnet18(num_classes=n_classes).to(device)
         print(f"Training ResNet18 shadow model {sm_index}")
-    elif train_cfg["train"]["model"] == "wideresnet":
+    elif m_name == "wideresnet":
         drop_rate = train_cfg["train"]["drop_rate"]
         model = WideResNet(depth=28, num_classes=n_classes, widen_factor=10, dropRate=drop_rate).to(device)
         print(f"Training WideResNet shadow model {sm_index}")
+    elif m_name == "mlp3":
+        input_dim = train_dataset.dataset.data.shape[1]
+        model = MLP3(input_dim=input_dim, num_classes=n_classes).to(device)
+    elif m_name == "mlp4":
+        input_dim = train_dataset.dataset.data.shape[1]
+        drop_rate = train_cfg["train"]["drop_rate"]
+        model = MLP4(input_dim=input_dim, num_classes=n_classes, dropout=drop_rate).to(device)
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    if train_cfg["train"]["optimizer"] == "SGD":
+        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
     
     train_loader, test_loader = get_dataloaders(batch_size, train_dataset, test_dataset)
     
     # ------------ TRAIN MODEL ------------ #
-    handler = CifarInputHandler();
-
-    augment = train_cfg["data"]["augment"]
-    if augment:
-        train_loader.dataset.dataset.augment = True
+    if m_name == "resnet" or m_name ==  "wideresnet":
+        handler = CifarInputHandler();
+    else:
+        handler = TabularInputHandler();
 
     train_result = handler.train(train_loader, model, criterion, optimizer, epochs, scheduler, device)
     sm_model = train_result.model
-
-    if augment:
-        train_loader.dataset.dataset.augment = False
-
     test_result = handler.eval(test_loader, model, criterion)
     
     # ------------ SAVE RESULTS ------------ #
@@ -224,7 +231,7 @@ def train_shadow_model(train_cfg, train_dataset, test_dataset, train_indices, te
                                     epochs = epochs,
                                     train_indices = train_indices,
                                     test_indices = test_indices,
-                                    dataset_name = train_cfg["data"]["dataset"])
+                                    dataset_name = ds_name)
     
     print(f"Calculating logits for shadow model: {sm_index}")
     labels = full_dataset.targets

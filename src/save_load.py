@@ -258,6 +258,7 @@ def loadVisData(study_name, path: str = "visualization_data"):
         dict[str, np.ndarray]: {title: data}
     """
     base_path = os.path.join("study", os.path.join(study_name, path))
+    os.makedirs(base_path, exist_ok=True)
 
     if not os.path.exists(base_path):
         raise FileNotFoundError(f"Visualization path does not exist: {base_path}")

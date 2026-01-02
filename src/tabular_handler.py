@@ -43,7 +43,7 @@ class TabularInputHandler(AbstractInputHandler):
             model.train()
             train_acc, train_loss, total_samples = 0.0, 0.0, 0
 
-            for inputs, labels in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}", leave=False, position=1):
+            for inputs, labels in dataloader:
                 #target = target.float().unsqueeze(1) # Used with BCE loss criterion and binary classification
                 #data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
 
