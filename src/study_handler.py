@@ -52,34 +52,35 @@ def objective(trial, config, device):
     T_max = trial.suggest_int("T_max", 25, config["study"]["epochs"], step=5)
 
     # --------- Dataset setup ---------
-    if config["data"]["dataset"] == "cifar10" or config["data"]["dataset"] == "cinic10":
-        n_classes = 10
-    elif config["data"]["dataset"] == "cifar100" or config["data"]["dataset"] == "purchase100":
-        n_classes = 100
-    else:
-        raise ValueError(f"Incorrect dataset {config['data']['dataset']}")
+    dataset_name = config["data"]["dataset"]
+    targets = train_dataset.dataset.targets
+    n_classes = int(torch.max(targets).item()) + 1
+    input_dim = train_dataset.dataset.data.shape[1]
 
     train_loader, val_loader = get_dataloaders(batch_size, train_dataset, test_dataset)
     
     # --------- Model setup ---------
-    if config["study"]["model"] == "resnet":
+    model_name = config["study"]["model"]
+    if model_name == "resnet":
         model = torchvision.models.resnet18(num_classes=n_classes).to(device)
-        print(f"Optimizing resnet on dataset {config['data']['dataset']}")
-    elif config["study"]["model"] == "wideresnet":
+        print(f"Optimizing baseline resnet on dataset {dataset_name} n_classes: {n_classes}")
+
+    elif model_name == "wideresnet":
         drop_rate = trial.suggest_float("drop_rate", 0.0, 0.5)
         model = WideResNet(depth=28, num_classes=n_classes, widen_factor=10, dropRate=drop_rate).to(device)
-        print(f"Optimizing wideresnet on dataset {config['data']['dataset']}")
-    elif config["study"]["model"] == "mlp3":
-        input_dim = train_dataset.dataset.data.shape[1]
+        print(f"Optimizing baseline wideresnet on dataset {dataset_name} with n_classes: {n_classes}")
+
+    elif model_name == "mlp3":
         model = MLP3(input_dim=input_dim, num_classes=n_classes).to(device)
-        print(f"Optimizing MLP3 on dataset {config['data']['dataset']}")
-    elif config["study"]["model"] == "mlp4":
-        input_dim = train_dataset.dataset.data.shape[1]
+        print(f"Optimizing baseline MLP3 on dataset {dataset_name}, n_classes: {n_classes}, input_dim: {input_dim}")
+
+    elif model_name == "mlp4":
         drop_rate = trial.suggest_float("drop_rate", 0.0, 0.5)
         model = MLP4(input_dim=input_dim, num_classes=n_classes, dropout=drop_rate).to(device)
-        print(f"Optimizing MLP4 on dataset {config['data']['dataset']}")
+        print(f"Optimizing baseline MLP4 on dataset {dataset_name}, n_classes: {n_classes}, input_dim: {input_dim}")
+
     else:
-        raise ValueError(f"Invalid model selection{config['train']['model']}")
+        raise ValueError(f"Invalid model selection{dataset_name}")
 
     # --------- Optimizer setup ---------
     optimizer_name = config['study']['optimizer']

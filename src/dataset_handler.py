@@ -320,8 +320,9 @@ def load_purchase():
     return dataset
 
 def load_texas():
-    print("❌ Loading of dataset: Texas100 is not implemented")
     dataset = np.load(os.path.join("data", "texas100.npz"))
+    print(f"Shape of features: {dataset['features'].shape}")
+    print(f"Shape of labels: {dataset['labels'].shape}")
     return dataset
 
 def load_location():
