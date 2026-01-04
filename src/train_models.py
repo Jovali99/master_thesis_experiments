@@ -13,77 +13,66 @@ from torch import save, load, optim, nn
 from src.cifar_handler import CifarInputHandler
 from src.cifar_handler import CifarInputHandler
 from LeakPro.leakpro import LeakPro
+from LeakPro.leakpro.attacks.mia_attacks.rmia import rmia_get_gtlprobs
 from src.models.resnet18_model import ResNet18
 from src.models.wideresnet28_model import WideResNet
 from src.utils import calculate_logits, rescale_logits, get_gtlprobs, calculate_logits_and_inmask
-from src.save_load import saveShadowModelSignals
+from src.save_load import saveShadowModelSignals, saveTargetSignals
 from src.dataset_handler import get_dataloaders, process_dataset_by_indices, build_balanced_dataset_indices
 
 def trainTargetModel(cfg, train_loader, test_loader, train_indices, test_indices, save_dir):
     os.makedirs("target", exist_ok=True)
+
+    # --------- Dataset setup ---------
     dataset_name = cfg["data"]["dataset"]
+    targets = train_loader.dataset.dataset.targets
+    n_classes = int(torch.max(targets).item()) + 1
+    input_dim = train_loader.dataset.dataset.data.shape[1]
 
-    if(dataset_name == "cifar10" or dataset_name == "cinic10"):
-        num_classes = 10
-    elif(dataset_name == "cifar100" or dataset_name == "purchase100" or dataset_name == "texas100"):
-        num_classes = 100
-    else:
-        raise ValueError(f"Invalid dataset {dataset_name}, ")
-
-    model_name = cfg["train"]["model"]
-    if model_name == "resnet":
-        model = ResNet18(num_classes=num_classes)
-    elif model_name == "wideresnet":
-        drop_rate = cfg["train"]["drop_rate"]
-        model = WideResNet(depth=28, num_classes=num_classes, widen_factor=10, dropRate=drop_rate)
-    elif model_name == "mlp3":
-        input_dim = train_loader.dataset.dataset.data.shape[1]
-        model = MLP3(input_dim=input_dim, num_classes=num_classes)
-    elif model_name == "mlp4":
-        input_dim = train_loader.dataset.dataset.data.shape[1]
-        drop_rate = cfg["train"]["drop_rate"]
-        model = MLP4(input_dim=input_dim, num_classes=num_classes, dropout=drop_rate)
-
-    print(f"====== Training model: {model_name} on dataset: {dataset_name} ======")
-
-    """Parse training configuration"""
+    # --------- Model setup ---------
+    drop_rate = cfg["train"]["drop_rate"]
     lr = cfg["train"]["learning_rate"]
     weight_decay = cfg["train"]["weight_decay"]
     epochs = cfg["train"]["epochs"]
     momentum = cfg["train"]["momentum"]
     t_max = cfg["train"]["t_max"]
 
+    model_name = cfg["train"]["model"]
+    if model_name == "resnet":
+        model = torchvision.models.resnet18(num_classes=n_classes)
+    elif model_name == "wideresnet":
+        model = WideResNet(depth=28, num_classes=n_classes, widen_factor=10, dropRate=drop_rate)
+    elif model_name == "mlp3":
+        model = MLP3(input_dim=input_dim, num_classes=n_classes)
+    elif model_name == "mlp4":
+        model = MLP4(input_dim=input_dim, num_classes=n_classes, dropout=drop_rate)
+    else:
+        raise ValueError(f"Invalid model selection{dataset_name}")
+
+    print(f"====== Training model: {model_name} on dataset: {dataset_name}, n_classes: {n_classes}, input_dim: {input_dim} ======")
+
     criterion = nn.CrossEntropyLoss()
-    print(f"Using optimizer: {cfg['train']['optimizer']}")
     if cfg["train"]["optimizer"] == "SGD":
         optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    # --- Initialize scheduler ---
+    # ------------ Initialize scheduler ------------ #
     if t_max is not None:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
     else:
         scheduler = None
 
-    if model_name == "resnet" or model_name ==  "wideresnet":
-        train_result = CifarInputHandler().train(dataloader=train_loader,
-                                                 model=model,
-                                                 criterion=criterion,
-                                                 optimizer=optimizer,
-                                                 epochs=epochs,
-                                                 scheduler=scheduler)
-
-        test_result = CifarInputHandler().eval(test_loader, model, criterion)
+    # ------------ TRAIN MODEL ------------ #
+    if model_name in ["resnet", "wideresnet"]:
+        handler = CifarInputHandler()
     else:
-        train_result = TabularInputHandler().train(dataloader=train_loader,
-                                                 model=model,
-                                                 criterion=criterion,
-                                                 optimizer=optimizer,
-                                                 epochs=epochs,
-                                                 scheduler=scheduler)
+        handler = TabularInputHandler()
 
-        test_result = TabularInputHandler().eval(test_loader, model, criterion)
+    train_result = handler.train(dataloader=train_loader, model=model,
+                                             criterion=criterion, optimizer=optimizer,
+                                             epochs=epochs, scheduler=scheduler)
+    test_result = handler.eval(test_loader, model, criterion)
 
     model.to("cpu")
     save(model.state_dict(), os.path.join(save_dir, "target_model.pkl"))
@@ -101,6 +90,16 @@ def trainTargetModel(cfg, train_loader, test_loader, train_indices, test_indices
     metadata_pkl_path = os.path.join(save_dir, "model_metadata.pkl")
     with open(metadata_pkl_path, "wb") as f:
         pickle.dump(meta_data, f)
+
+    # ------------ Calc and Save Logits and GTL Probs ------------ #
+
+    with open(metadata_pkl_path, "rb") as f:
+        metadata_pkl = pickle.load(f)
+    labels = np.array(targets)
+    logits, in_mask = calculate_logits_and_inmask(train_loader.dataset.dataset, model, metadata_pkl, save_dir, idx=None, save=False)
+    resc_logits = rescale_logits(logits, labels)
+    gtl_probs = rmia_get_gtlprobs(logits, labels)
+    saveTargetSignals(logits, in_mask, save_dir, resc_logits, gtl_probs)
 
     return train_result, test_result
 
@@ -178,33 +177,28 @@ def train_shadow_model(train_cfg, train_dataset, test_dataset, train_indices, te
     momentum = train_cfg["train"]["momentum"]
     t_max = train_cfg["train"]["t_max"]
     batch_size = train_cfg["train"]["batch_size"]
+    optim_name = train_cfg["train"]["optimizer"]
+    drop_rate = train_cfg["train"]["drop_rate"]
 
+    # --------- Dataset setup ---------
     ds_name = train_cfg["data"]["dataset"]
-    if ds_name in ["cifar10", "cinic10"]:
-        n_classes = 10
-    elif ds_name in ["cifar100", "purchase100"]:
-        n_classes = 100
-    else:
-        raise ValueError(f"Incorrect dataset {train_cfg['data']['dataset']}")
+    targets = train_dataset.dataset.targets
+    n_classes = int(torch.max(targets).item()) + 1
+    input_dim = train_dataset.dataset.data.shape[1]
 
     m_name = train_cfg["train"]["model"]
     if m_name == "resnet":
         model = torchvision.models.resnet18(num_classes=n_classes).to(device)
-        print(f"Training ResNet18 shadow model {sm_index}")
     elif m_name == "wideresnet":
-        drop_rate = train_cfg["train"]["drop_rate"]
         model = WideResNet(depth=28, num_classes=n_classes, widen_factor=10, dropRate=drop_rate).to(device)
-        print(f"Training WideResNet shadow model {sm_index}")
     elif m_name == "mlp3":
-        input_dim = train_dataset.dataset.data.shape[1]
         model = MLP3(input_dim=input_dim, num_classes=n_classes).to(device)
     elif m_name == "mlp4":
-        input_dim = train_dataset.dataset.data.shape[1]
-        drop_rate = train_cfg["train"]["drop_rate"]
         model = MLP4(input_dim=input_dim, num_classes=n_classes, dropout=drop_rate).to(device)
+    print(f"Training {m_name} shadow model {sm_index} on dataset: {ds_name}")
     
     criterion = nn.CrossEntropyLoss()
-    if train_cfg["train"]["optimizer"] == "SGD":
+    if optim_name == "SGD":
         optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -213,7 +207,7 @@ def train_shadow_model(train_cfg, train_dataset, test_dataset, train_indices, te
     train_loader, test_loader = get_dataloaders(batch_size, train_dataset, test_dataset)
     
     # ------------ TRAIN MODEL ------------ #
-    if m_name == "resnet" or m_name ==  "wideresnet":
+    if m_name == "resnet" or m_name == "wideresnet":
         handler = CifarInputHandler();
     else:
         handler = TabularInputHandler();

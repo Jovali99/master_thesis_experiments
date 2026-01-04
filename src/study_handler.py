@@ -184,29 +184,22 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
     model_name = cfg["fbd_study"]["model"]
     if model_name == "resnet":
         model = torchvision.models.resnet18(num_classes=n_classes).to(device)
-        print(f"Optimizing FbD resnet on dataset {dataset_name} n_classes: {n_classes}")
-
     elif model_name == "wideresnet":
         model = WideResNet(depth=28, num_classes=n_classes, widen_factor=10, dropRate=drop_rate).to(device)
-        print(f"Optimizing FbD wideresnet on dataset {dataset_name} with n_classes: {n_classes}")
-
     elif model_name == "mlp3":
         model = MLP3(input_dim=input_dim, num_classes=n_classes).to(device)
-        print(f"Optimizing FbD MLP3 on dataset {dataset_name} n_classes: {n_classes}")
-
     elif model_name == "mlp4":
         model = MLP4(input_dim=input_dim, num_classes=n_classes, dropout=drop_rate).to(device)
-        print(f"Optimizing FbD MLP4 on dataset {dataset_name} n_classes: {n_classes}")
-
     else:
         raise ValueError(f"Invalid model selection{dataset_name}")
+    print(f"Optimizing FbD {model_name} on dataset {dataset_name} n_classes: {n_classes}")
 
     # ------------ Choose Optimizer ------------ #
     if optim_name == "SGD":
         optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-
+    
     criterion = nn.CrossEntropyLoss(reduction="none")
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
 
