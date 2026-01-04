@@ -107,14 +107,14 @@ class TabularInputHandler(AbstractInputHandler):
         for epoch in range(epochs):
             train_loss, train_acc, total_samples = 0, 0, 0
             model.train()
-            for org_idx, batch_weights, inputs, labels in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}"):
+            for org_idx, batch_weights, inputs, labels in dataloader:
                 labels = labels.long()
                 inputs, labels, batch_weights = inputs.to(gpu_or_cpu, non_blocking=True), labels.to(gpu_or_cpu, non_blocking=True), batch_weights.to(gpu_or_cpu, non_blocking=True)
                 
                 optimizer.zero_grad()
                 outputs = model(inputs)
-
                 loss = criterion(outputs, labels)
+
                 # Apply weighted loss
                 weighted_loss = (loss * batch_weights).mean()
 

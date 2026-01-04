@@ -82,7 +82,7 @@ def objective(trial, config, device):
         raise ValueError(f"Invalid model selection{config['train']['model']}")
 
     # --------- Optimizer setup ---------
-    optimizer_name = config['train']['optimizer']
+    optimizer_name = config['study']['optimizer']
         
     if config['study']['model'] == "mlp3" or config['study']['model'] == "mlp4":
         optimizer_name = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
@@ -170,52 +170,66 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
     momentum = cfg["fbd_study"]["momentum"]
     t_max = cfg["fbd_study"]["t_max"]
     batch_size = cfg["fbd_study"]["batch_size"]
+    optim_name = cfg["fbd_study"]["optimizer"]
+    drop_rate = cfg["fbd_study"]["drop_rate"]
 
-    if(cfg["data"]["dataset"] == "cifar10" or cfg["data"]["dataset"] == "cinic10"):
-        num_classes = 10
-    elif(cfg["data"]["dataset"] == "cifar100"):
-        num_classes = 100
-    else:
-        raise ValueError(f"Incorrect dataset {cfg['data']['dataset']}")
+    # --------- Dataset setup ---------
+    dataset_name = cfg["data"]["dataset"]
+    targets = train_dataset.targets
+    n_classes = int(torch.max(targets).item()) + 1
+    input_dim = train_dataset.dataset.data.shape[1]
     
-    if cfg["fbd_study"]["model"] == "resnet":
-        model = torchvision.models.resnet18(num_classes=num_classes).to(device)
-        print("Optimizing resnet")
-    elif cfg["fbd_study"]["model"] == "wideresnet":
-        drop_rate = cfg["fbd_study"]["drop_rate"]
-        model = WideResNet(depth=28, num_classes=num_classes, widen_factor=10, dropRate=drop_rate).to(device)
-        print("Optimizing wideresnet")
+    # --------- Model setup ---------
+    model_name = cfg["fbd_study"]["model"]
+    if model_name == "resnet":
+        model = torchvision.models.resnet18(num_classes=n_classes).to(device)
+        print(f"Optimizing FbD resnet on dataset {dataset_name} n_classes: {n_classes}")
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
+    elif model_name == "wideresnet":
+        model = WideResNet(depth=28, num_classes=n_classes, widen_factor=10, dropRate=drop_rate).to(device)
+        print(f"Optimizing FbD wideresnet on dataset {dataset_name} with n_classes: {n_classes}")
+
+    elif model_name == "mlp3":
+        model = MLP3(input_dim=input_dim, num_classes=n_classes).to(device)
+        print(f"Optimizing FbD MLP3 on dataset {dataset_name} n_classes: {n_classes}")
+
+    elif model_name == "mlp4":
+        model = MLP4(input_dim=input_dim, num_classes=n_classes, dropout=drop_rate).to(device)
+        print(f"Optimizing FbD MLP4 on dataset {dataset_name} n_classes: {n_classes}")
+
+    else:
+        raise ValueError(f"Invalid model selection{dataset_name}")
+
+    # ------------ Choose Optimizer ------------ #
+    if optim_name == "SGD":
+        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay,)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    criterion = nn.CrossEntropyLoss(reduction="none")
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
 
+    # ------------ Get the Dataloaders ------------ #
     train_loader, test_loader = get_weighted_dataloaders(batch_size, train_dataset, test_dataset, weights)
 
     # ------------ TRAIN MODEL ------------ #
-    handler = CifarInputHandler();
-
-    augment = cfg["data"]["augment"]
-    if augment:
-        train_loader.dataset.dataset.augment = True
+    if model_name in ["resnet", "wideresnet"]:
+        handler = CifarInputHandler()
+    else:
+        handler = TabularInputHandler()
 
     handler.trainStudyFbD(train_loader, model, criterion, optimizer, epochs, noise_std, scheduler)
-
-    if augment:
-        train_loader.dataset.dataset.augment = False
-
     test_accuracy = handler.eval(test_loader, model, criterion).accuracy
 
-    # ------------ SAVE RESULTS ------------ #
+    # ------------ Calculate Logits and GTL Probs ------------ #
     full_dataset = train_dataset.dataset
 
     model.to(device)
+
     target_logits = calculate_logits(model, full_dataset, device)
     labels = np.array(full_dataset.targets)
-
     rescaled_target_logits = rescale_logits(target_logits, labels)
     target_gtl_probs = rmia_get_gtlprobs(target_logits, labels)
-    
     scores = rmia_vectorised(target_gtl_probs, shadow_gtl_probs, shadow_inmask, online=True, use_gpu_if_available=True)
 
     model.to("cpu")
@@ -223,9 +237,8 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
     tauc_weighted = calculate_tauc(scores, target_inmask, fpr=0.1)
     tau = np.log(tauc_weighted/tauc_ref)
 
+    # ------------ SAVE RESULTS ------------ #
     metadata = buildTrialMetadata(noise_std, centrality, temperature, test_accuracy, tau)
     saveTrial(metadata, target_gtl_probs, rescaled_target_logits, trial.number, save_path)
 
     return tau, test_accuracy
-
-
