@@ -155,7 +155,7 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
         Temperature: Trial between [0.000 + 1e-6, 0.5] step = 0.05
     """
     # study params
-    noise_std = trial.suggest_float("noise_std", 1e-4, 5e-2, step=0.005)
+    noise_std = trial.suggest_float("noise_std", 1e-4, 5.01e-2, step=0.005)
     centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
     temperature = trial.suggest_float("temperature", 0.0, 5e-1, step=0.05)
 

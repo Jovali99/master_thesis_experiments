@@ -104,7 +104,7 @@ class TabularInputHandler(AbstractInputHandler):
         loss_history = []
         
         # training loop
-        for epoch in range(epochs):
+        for epoch in tqdm(range(epochs), desc="Training Progress"):
             train_loss, train_acc, total_samples = 0, 0, 0
             model.train()
             for org_idx, batch_weights, inputs, labels in dataloader:

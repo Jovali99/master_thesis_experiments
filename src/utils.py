@@ -80,7 +80,10 @@ def get_shadow_signals(shadow_logits, shadow_inmask, amount):
     return logits_sub, inmask_sub
 
 def sigmoid_weigths(score: np.ndarray, centrality: float, temperature: float, epsilon: float = 1e-6) -> np.ndarray:
-    exp = np.exp((score-centrality)/(temperature+epsilon))
+    temp = temperature+epsilon
+    x = (score-centrality)/temp
+    x = np.clip(x, -20, 20)  # Prevent overflow warnings
+    exp = np.exp(x)
     weight = 1.0/(1.0+exp)
     return weight
 
