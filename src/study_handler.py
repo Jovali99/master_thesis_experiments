@@ -175,7 +175,7 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
 
     # --------- Dataset setup ---------
     dataset_name = cfg["data"]["dataset"]
-    targets = train_dataset.targets
+    targets = train_dataset.dataset.targets
     n_classes = int(torch.max(targets).item()) + 1
     input_dim = train_dataset.dataset.data.shape[1]
     
