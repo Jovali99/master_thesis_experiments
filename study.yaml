@@ -5,21 +5,12 @@ study: # Configuration for training
   batch_size: 128 # Integer number for indicating batch size for training the target model.
   optimizer: SGD # String which indicates the optimizer.
   model: mlp3
-  gpu_ids:  # List of available gpus to use for parallell processing, this needs to be checked before every run
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
   root: ./study
 
 data: # Configuration for data
   dataset: purchase100 # String indicates the name of the dataset
   f_train: 0.5 # Float number from 0 to 1 indicating the fraction of the train dataset
   f_test: 0.5 # Float number from 0 to 1 indicating the size of the test set
-  augment: False
   root: ./data # String about where to save the data.
 
 

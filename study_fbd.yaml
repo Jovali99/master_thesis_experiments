@@ -1,30 +1,11 @@
 fbd_study: # Configuration for training
-  study_name: "purchase100-mlp3-fbd"
   target_folder: "mlp3-purchase100-1594b978b1"
   trials: 1000
-  epochs: 25 # Integer number for indicating the epochs for training target model.
-  batch_size: 128 # Integer number for indicating batch size for training the target model.
-  optimizer: SGD # String which indicates the optimizer.
-  learning_rate: 0.01 # Float number for indicating learning rate for training the target model. For speedyresnet, it uses its own learning_rate.
-  momentum: 0.9
-  weight_decay: 0.0 # Float number for indicating weight decay for training the target model. For speedyresnet, it uses its own weight_decay.
-  t_max: 30 # Scheduler start point for adjusting the learing rate
-  model: mlp3
   shadow_model_count: 256
-  gpu_ids:  # List of available gpus to use for parallell processing, this needs to be checked before every run
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
   root: ./study
 
 data: # Configuration for data
   dataset: purchase100 # String indicates the name of the dataset
-  default_dist: False # Should custom training and testing dataset be used, if false f_train and f_test will be used
   f_train: 0.5 # Float number from 0 to 1 indicating the fraction of the train dataset
   f_test: 0.5 # Float number from 0 to 1 indicating the size of the test set
-  augment: False
   root: ./data # String about where to save the data.

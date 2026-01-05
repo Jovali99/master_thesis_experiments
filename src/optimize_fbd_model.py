@@ -74,9 +74,8 @@ def run_optimization(config, gpu_id, trials, save_path, hash_id, fbd_args: FbdAr
     df.to_csv(os.path.join(save_path, f"results_gpu_{gpu_id}.csv"), index=False) 
     print(f"📄 Results saved to {os.path.join(save_path, f'results_gpu_{gpu_id}.csv')}")
 
-def parallell_optimization(config, labels, fbd_args, study_hash: str | None = None):
+def parallell_optimization(config, labels, fbd_args, gpu_ids = [0], study_hash: str | None = None):
     study_cfg = config['fbd_study']
-    gpu_ids = study_cfg["gpu_ids"]
     print(f"Starting parallell optimization using the following gpu ids: {gpu_ids}")
 
     if study_hash is not None:
