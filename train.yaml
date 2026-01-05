@@ -1,18 +1,9 @@
 train: # Configuration for training
+  study_name: texas100-mlp3-baseline-db7c7aba7a # Baseline study to load params from
   epochs: 50 # Integer number for indicating the epochs for training target model. For speedyresnet, it uses its own number of epochs.
-  batch_size: 128 # Integer number for indicating batch size for training the target model. For speedyresnet, it uses its own batch size.
-  virtual_batch_size: 16 # When training with DP-SGD, virtual batch size can be used to lowers the VRAM requirement.
-  optimizer: SGD # String which indicates the optimizer. We support Adam and SGD. For speedyresnet, it uses its own optimizer.
-  learning_rate: 0.01 # Float number for indicating learning rate for training the target model. For speedyresnet, it uses its own learning_rate.
-  momentum: 0.9
-  weight_decay: 0.0 # Float number for indicating weight decay for training the target model. For speedyresnet, it uses its own weight_decay.
-  t_max: 30 # Scheduler start point for adjusting the learing rate
-  model: mlp3 
-  drop_rate: 0.5
 
 data: # Configuration for data
   dataset: purchase100 # String indicates the name of the dataset
   f_train: 0.5 # Float number from 0 to 1 indicating the fraction of the train dataset
   f_test: 0.5 # Float number from 0 to 1 indicating the size of the test set
-  augment: False
   root: ./data # String about where to save the data.
