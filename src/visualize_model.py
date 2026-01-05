@@ -4,8 +4,6 @@ class VisualizeModel():
     """Class used for visualization of a trained models evaluation"""
 
     def visualize(self, train_result, test_result):
-        print("-- Visualizing evaluation of model ResNet18 on cifar10  --")
-
         train_acc = train_result.metrics.extra["accuracy_history"]
         train_loss = train_result.metrics.extra["loss_history"]
         test_acc = test_result.accuracy

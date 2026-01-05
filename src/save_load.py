@@ -6,6 +6,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from src.dataclasses import FbdTrialResults
 import pickle
+import optuna
 
 def buildAuditMetadata(trainCfg: dict, auditCfg: dict = {}) -> dict:
     """
@@ -619,3 +620,33 @@ def plot_bootstrap_band(ax, x, y, label, color):
 
     ax.plot(xm, ym, color=color, label=label)
     ax.fill_between(xm, ylow, yhigh, color=color, alpha=0.2)
+    
+def copy_study_to_global(node_db_path, global_db_path, study_name):
+    node_storage = f"sqlite:///{node_db_path}"
+    global_storage = f"sqlite:///{global_db_path}"
+
+    node_study = optuna.load_study(
+        study_name=study_name,
+        storage=node_storage,
+    )
+
+    global_study = optuna.create_study(
+        study_name=study_name,
+        storage=global_storage,
+        directions=node_study.directions,
+        load_if_exists=False,  # guaranteed unique
+    )
+
+    for trial in node_study.trials:
+        if trial.state != optuna.trial.TrialState.COMPLETE:
+            continue
+
+        global_study.add_trial(
+            optuna.trial.create_trial(
+                params=trial.params,
+                distributions=trial.distributions,
+                values=trial.values,
+                user_attrs=trial.user_attrs,
+                system_attrs=trial.system_attrs,
+            )
+        )

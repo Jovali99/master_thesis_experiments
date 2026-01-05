@@ -23,7 +23,7 @@ from optuna.storages.journal import JournalFileBackend
 import src.study_handler as sh
 from src.utils import print_yaml, get_shadow_signals, calculate_tauc
 from LeakPro.leakpro.attacks.mia_attacks.rmia import rmia_vectorised, rmia_get_gtlprobs
-from src.save_load import loadTargetSignals, loadShadowModelSignals
+from src.save_load import loadTargetSignals, loadShadowModelSignals, copy_study_to_global
 from src.dataclasses import FbdArgs
 
 try:
@@ -31,7 +31,7 @@ try:
 except RuntimeError:
     pass
 
-def run_optimization(config, gpu_id, trials, save_path, hash_id, fbd_args: FbdArgs): 
+def run_optimization(config, gpu_id, trials, save_path, hash_id, fbd_args: FbdArgs, node_id: int | None = None): 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -40,8 +40,13 @@ def run_optimization(config, gpu_id, trials, save_path, hash_id, fbd_args: FbdAr
     study_cfg = config['fbd_study']
 
     # Parallell storage setup
-    db_path = os.path.join(study_cfg['root'], "fbd_study.db")
-    storage = f"sqlite:///{db_path}"
+    global_db_path = os.path.join(study_cfg['root'], "fbd_study.db")
+    if node_id is None:
+        storage = f"sqlite:///{global_db_path}"
+    else:
+        # Use a node specific db
+        node_db_path = os.path.join(study_cfg['root'], f"fbd_study_{node_id}.db")
+        storage = f"sqlite:///{node_db_path}"
     
     study = optuna.create_study(
         study_name=f"{study_cfg['study_name']}-{hash_id}",
@@ -73,8 +78,15 @@ def run_optimization(config, gpu_id, trials, save_path, hash_id, fbd_args: FbdAr
     df = study.trials_dataframe() 
     df.to_csv(os.path.join(save_path, f"results_gpu_{gpu_id}.csv"), index=False) 
     print(f"📄 Results saved to {os.path.join(save_path, f'results_gpu_{gpu_id}.csv')}")
+    
+    if node_id is not None:
+        copy_study_to_global(
+            node_db_path=node_db_path,
+            global_db_path=global_db_path,
+            study_name=f"{study_cfg['study_name']}-{hash_id}",
+        )
 
-def parallell_optimization(config, labels, fbd_args, gpu_ids = [0], study_hash: str | None = None):
+def parallell_optimization(config, labels, fbd_args, gpu_ids = [0], study_hash: str | None = None, node_id: int | None = None):
     study_cfg = config['fbd_study']
     print(f"Starting parallell optimization using the following gpu ids: {gpu_ids}")
 
