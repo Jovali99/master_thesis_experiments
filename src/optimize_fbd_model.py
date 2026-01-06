@@ -43,10 +43,12 @@ def run_optimization(config, gpu_id, trials, save_path, hash_id, fbd_args: FbdAr
     global_db_path = os.path.join(study_cfg['root'], "fbd_study.db")
     if node_id is None:
         storage = f"sqlite:///{global_db_path}"
+        print("Running study on Global optuna database")
     else:
         # Use a node specific db
         node_db_path = os.path.join(study_cfg['root'], f"fbd_study_{node_id}.db")
         storage = f"sqlite:///{node_db_path}"
+        print(f"Running study on Node-{node_id} optuna database")
     
     study = optuna.create_study(
         study_name=f"{study_cfg['study_name']}-{hash_id}",
@@ -111,7 +113,7 @@ def parallell_optimization(config, labels, fbd_args, gpu_ids = [0], study_hash: 
         print(f"Running {trials} on gpu: {gpu_id}")
         p = multiprocessing.Process(
             target=run_optimization,
-            args=(config, gpu_id, trials, save_path, hash_id, fbd_args)
+            args=(config, gpu_id, trials, save_path, hash_id, fbd_args, node_id)
         )
         processes.append(p)
     

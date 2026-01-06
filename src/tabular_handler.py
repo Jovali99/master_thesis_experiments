@@ -181,7 +181,7 @@ class TabularInputHandler(AbstractInputHandler):
         return EvalOutput(**output_dict)
 
     class TabularUserDataset(AbstractInputHandler.UserDataset):
-        def __init__(self, data, targets, normalize=True, one_hot=False, mean=None, std=None):
+        def __init__(self, data, targets, normalize=True, from_one_hot=False, mean=None, std=None):
             """
             Args:
                 data (Tensor): Tabular data of shape (N, D)
@@ -200,11 +200,14 @@ class TabularInputHandler(AbstractInputHandler):
 
             self.data = data.float()  # Ensure float type
             self.normalize = normalize
-
-            if one_hot:
-                self.targets = targets.float()
-            else:
+            
+            # Converts a dataset from one_hot encoding to index based
+            if from_one_hot:
+                assert targets.dim() == 2, "Expected one-hot encoded targets for from_one_hot=True"
                 self.targets = targets.argmax(dim=1).long()
+            else:
+                assert targets.dim() == 1, "Expected class indices for from_one_hot=False"
+                self.targets = targets.long()
 
             if normalize:
                 if mean is None or std is None:

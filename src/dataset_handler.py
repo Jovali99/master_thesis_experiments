@@ -120,7 +120,10 @@ def processDataset(data_cfg, trainset, testset, in_indices_mask=None, dataset=No
         print(f"⏳Converting tabular data: {data_cfg['dataset']} to dataset")
         features = dataset['features']
         labels = dataset['labels']
-        dataset = TabularInputHandler.TabularUserDataset(features, labels)
+        if data_cfg["dataset"] in ["purchase100", "texas100"]:
+            dataset = TabularInputHandler.TabularUserDataset(features, labels, from_one_hot=True)
+        else:
+            dataset = TabularInputHandler.TabularUserDataset(features, labels, from_one_hot=False)
 
     if dataset is None:
         print("-- Processing dataset for training --")
