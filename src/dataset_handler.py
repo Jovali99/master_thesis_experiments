@@ -329,6 +329,22 @@ def load_texas():
     return dataset
 
 def load_location():
-    print("❌ Loading of dataset: Location is not implemented")
-    dataset = np.load(os.path.join("data", "texas100.npz"))
+    path = os.path.join("data", "location")
+    data = np.genfromtxt(
+        path,
+        delimiter=",",
+        dtype=str
+    )
+    print(f"location: {data.shape}")
+    
+    x = data[:, 1:].astype(np.float32)   # 446 features
+    y = np.char.strip(data[:, 0], '"').astype(int) # labels
+    y -= 1 # Zero based: 0-29, instead of 1-30
+    dataset = {
+        "features": x,
+        "labels": y
+    }
+    print(f"Shape of features: {dataset['features'].shape}")
+    print(f"Shape of labels: {dataset['labels'].shape}")
+
     return dataset
