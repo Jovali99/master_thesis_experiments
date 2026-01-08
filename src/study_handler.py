@@ -155,10 +155,20 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
         Centrality: Trial stepped between [0.0, 1.0] step = 0.1
         Temperature: Trial between [0.000 + 1e-6, 0.5] step = 0.05
     """
-    # study params
-    noise_std = trial.suggest_float("noise_std", 1e-4, 5.01e-2, step=0.005)
-    centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
-    temperature = trial.suggest_float("temperature", 0.0, 5e-1, step=0.05)
+    # ------------ study params setup ------------
+    if cfg['fbd_study']["privacy_onion"]:
+        noise_std = 0.0
+        centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.05)
+        temperature = 0.0
+    elif cfg['fbd_study']["noise_injection"]:
+        levels = [10, 0.07, 0.05, 0.04, 0.03, 0.02, 0.01, 0.005, 0.003, 0.001, 0.0005, 0.0001]
+        noise_std = trial.suggest_categorical("noise_std", levels)
+        centrality = 1.0
+        temperature = 0.0
+    else:
+        noise_std = trial.suggest_float("noise_std", 0.0, 5e-2, step=0.005)
+        centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
+        temperature = trial.suggest_float("temperature", 0.0, 5e-1, step=0.05)
 
     # Calculate the weights
     weights = sigmoid_weigths(rmia_scores, centrality, temperature)
