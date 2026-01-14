@@ -223,7 +223,9 @@ def calculate_group_roc(
     tpr_interp_all = []
 
     for scores, inmask in zip(scores_list, inmask_list):
-        tpr, fpr = calculate_roc(scores, inmask, clip=clip, eps=eps)
+        #tpr, fpr = calculate_roc(scores, inmask, clip=clip, eps=eps)
+        fpr, tpr, _  = roc_curve(inmask, scores)
+        
 
         # Ensure monotonicity for interpolation
         fpr_unique, idx = np.unique(fpr, return_index=True)

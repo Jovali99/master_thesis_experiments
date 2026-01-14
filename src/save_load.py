@@ -244,21 +244,22 @@ def saveShadowModelSignals(identifier: int, logits: np.ndarray=None, in_mask: np
 
     print(f"✅ Saved shadow model signals at: {path}")
 
-def saveVisData(data: np.ndarray, title: str, study_name: str, path: str = "visualization_data"):
-    save_path = os.path.join(os.path.join("study", study_name), path)
+def saveVisData(data: np.ndarray, title: str, study_name: str, path: str = "study"):
+    save_path = os.path.join(os.path.join(path, study_name), "visualization_data")
     os.makedirs(save_path, exist_ok=True)
     f_path = os.path.join(save_path, title)
     np.save(f_path, data)
     return print(f"Visualization data: {title}, with shape: {data.shape}, has been saved to: {f_path}.")
 
-def loadVisData(study_name, path: str = "visualization_data"):
+def loadVisData(study_name, study_path: str = "study"):
     """
     Load all visualization data stored under <study_name>/<path>.
 
     Returns:
         dict[str, np.ndarray]: {title: data}
     """
-    base_path = os.path.join("study", os.path.join(study_name, path))
+
+    base_path = os.path.join(study_path, os.path.join(study_name, "visualization_data"))
     os.makedirs(base_path, exist_ok=True)
 
     if not os.path.exists(base_path):
@@ -415,7 +416,7 @@ def loadShadowModelSignals(target_name: str, load_dict: dict = None, path: str =
 
     return sm_logits, sm_resc_logits, sm_gtl_probs, sm_in_masks, sm_metadata, missing_indices
 
-def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logits: bool = True, start_index: int = 0):
+def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logits: bool = True, start_index: int = 0, path: str = "study"):
     """
     Load FBD study output files from the study/<study_name>/trial_outputs directory.
     Files must follow the indexed naming scheme:
@@ -423,7 +424,7 @@ def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logit
       gtl_probabilities/gtl_probabilities_{i}.npy
       rescaled_logits/rescaled_logits_{i}.npy
     """
-    study_dir = os.path.join("study", study_name)
+    study_dir = os.path.join(path, study_name)
     trial_outputs_dir = os.path.join(study_dir, "trial_outputs")
     
     # Load labels
@@ -546,7 +547,7 @@ def loadAudit(audit_signals_name: str, save_path: str = "audit_signals"):
     return (metadata, rescaled_target_logits, rescaled_shadow_model_logits,
             shadow_models_in_mask, target_in_mask, audit_data_indices)
 
-def savePlot(fig, filename: str, audit_dir: str, savePath: str = "audit_signals", dpi: int = 300, fmt: str = "png"):
+def savePlot(fig, filename: str, study_name: str, savePath: str = "study", dpi: int = 300, fmt: str = "png"):
     """
     Save a matplotlib figure with high-quality settings.
     
@@ -564,7 +565,7 @@ def savePlot(fig, filename: str, audit_dir: str, savePath: str = "audit_signals"
         fmt: str
             File format ("png", "pdf", "svg", ...).
     """
-    plot_path = os.path.join(audit_dir, "plot")
+    plot_path = os.path.join(study_name, "plot")
     save_dir = os.path.join(savePath, plot_path)
     os.makedirs(save_dir, exist_ok=True)
     full_path = os.path.join(save_dir, f"{filename}.{fmt}")
