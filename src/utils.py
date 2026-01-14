@@ -1,6 +1,5 @@
-from LeakPro.leakpro.attacks.mia_attacks.lira import lira_vectorized
 from sklearn.metrics import roc_curve
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from src.save_load import saveShadowModelSignals, saveTargetSignals
 from torch import cat, exp, from_numpy, max, sigmoid, sum
