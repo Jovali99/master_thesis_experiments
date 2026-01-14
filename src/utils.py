@@ -202,28 +202,19 @@ def calculate_roc(scores: np.ndarray, target_inmask: np.ndarray, clip: bool = Fa
         
     return tpr_curve, fpr_curve
 
-def calculate_group_roc(
-    scores_list: list[np.ndarray],
-    inmask_list: list[np.ndarray],
-    fpr_grid: np.ndarray = None,
-    clip: bool = True,
-    eps: float = 1e-6,
-):
+def calculate_group_roc_interpolated(scores_list: list[np.ndarray], inmask: np.ndarray, fpr_grid: np.ndarray = None,):
     """
     Compute mean ROC curve over multiple models.
-
-    Each element in scores_list and inmask_list corresponds to one model.
+    Each element in scores_list corresponds to one model.
     """
-
-    assert len(scores_list) == len(inmask_list)
+    assert len(scores_list)
 
     if fpr_grid is None:
         fpr_grid = np.logspace(-5, 0, 300)
 
     tpr_interp_all = []
 
-    for scores, inmask in zip(scores_list, inmask_list):
-        #tpr, fpr = calculate_roc(scores, inmask, clip=clip, eps=eps)
+    for scores in scores_list:
         fpr, tpr, _  = roc_curve(inmask, scores)
         
 
@@ -238,6 +229,18 @@ def calculate_group_roc(
     tpr_std  = np.std(tpr_interp_all, axis=0)
 
     return fpr_grid, tpr_mean, tpr_std
+
+def calculate_group_roc_pooled(scores_list: list[np.ndarray], inmask: np.ndarray):
+    """
+    Compute ROC curve by pooling scores from multiple models.
+    """
+    # Repeat inmask for each model
+    pooled_scores = np.concatenate(scores_list)
+    pooled_inmask = np.tile(inmask, len(scores_list))
+
+    fpr, tpr, thresholds = roc_curve(pooled_inmask, pooled_scores)
+
+    return fpr, tpr
 
 def calculate_tpr_at_fpr(tpr_curve, fpr_curve, fpr: float = 1.0):
     """
@@ -445,6 +448,78 @@ def plot_bootstrap_band(ax, x, y, label, color):
 
     ax.plot(xm, ym, color=color, label=label)
     ax.fill_between(xm, ylow, yhigh, color=color, alpha=0.2)
+    
+def plot_roc(ax, fpr_curves, tpr_curves, labels, b_fpr, b_tpr, b_label, title=None, fpr_min=1e-5):
+    """ Plot multiple ROC curves on a given axis. """
+    # Colors
+    colors = ["orange", "green", "purple", "olive", "pink"][:len(labels)]
+    
+    # Random guessing line
+    random_fpr = np.logspace(np.log10(fpr_min), 0, 500)
+    ax.plot(random_fpr, random_fpr, "--", color="red", alpha=0.7, label="Random Guessing")
+
+    # Baseline ROC
+    ax.plot(b_fpr, b_tpr, color="cornflowerblue", label=b_label)
+    
+    # Plot all curves
+    for i, (fpr, tpr, label) in enumerate(zip(fpr_curves, tpr_curves, labels)):
+        color = None if colors is None else colors[i]
+        ax.plot(fpr, tpr, color=color, label=label)
+
+    # Axis formatting
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(fpr_min, 1.0)
+    ax.set_ylim(fpr_min, 1.0)
+    ax.set_xlabel("FPR")
+    ax.set_ylabel("TPR")
+    if title:
+        ax.set_title(title, fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="lower right")
+    
+def plot_pareto(ax, cut_group, paretos, grp_fpr):
+    # Scatter of all points
+    ax.plot(cut_group["rmia_mean"], cut_group["accuracy_mean"], '.', label="RMIA Scatter")
+    ax.plot(cut_group["lira_mean"], cut_group["accuracy_mean"], '.', label="LiRA Scatter")
+    
+    # Pareto frontiers
+    ax.plot(paretos[0]["lira_mean"], paretos[0]["accuracy_mean"], label="LiRA Pareto")
+    ax.plot(paretos[1]["rmia_mean"], paretos[1]["accuracy_mean"], label="RMIA Pareto")
+
+    # median ± std bars for LIRA Pareto
+    ax.hlines(
+        paretos[0]["accuracy_mean"],
+        paretos[0]["lira_mean"] - paretos[0]["lira_std"],
+        paretos[0]["lira_mean"] + paretos[0]["lira_std"],
+        color="gray", alpha=0.7
+    )
+    ax.vlines(
+        paretos[0]["lira_median"],
+        paretos[0]["accuracy_mean"] - 0.005,
+        paretos[0]["accuracy_mean"] + 0.005,
+        color="black", alpha=0.7, linewidth=1
+    )
+
+    # mean ± std bars for RMIA Pareto
+    ax.hlines(
+        paretos[1]["accuracy_mean"],
+        paretos[1]["rmia_mean"] - paretos[1]["rmia_std"],
+        paretos[1]["rmia_mean"] + paretos[1]["rmia_std"],
+        color="gray", alpha=0.7
+    )
+    ax.vlines(
+        paretos[1]["rmia_median"],
+        paretos[1]["accuracy_mean"] - 0.005,
+        paretos[1]["accuracy_mean"] + 0.005,
+        color="black", alpha=0.7, linewidth=1
+    )
+    
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="lower right")
+    ax.set_xlabel(f"Membership Inference Vulnerability (τ@{grp_fpr})")
+    ax.set_ylabel("Accuracy")
+    ax.set_title("Pareto Frontiers of Accuracy vs. MIA Risk", fontsize=10)
 
 def softmax_logits(logits: np.ndarray, temp:float=1.0, dimension:int=-1) -> np.ndarray:
     """Rescale logits to (0, 1).
