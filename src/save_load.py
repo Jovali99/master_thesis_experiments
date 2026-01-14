@@ -416,7 +416,7 @@ def loadShadowModelSignals(target_name: str, load_dict: dict = None, path: str =
 
     return sm_logits, sm_resc_logits, sm_gtl_probs, sm_in_masks, sm_metadata, missing_indices
 
-def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logits: bool = True, start_index: int = 0, path: str = "study"):
+def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logits: bool = True, path: str = "study"):
     """
     Load FBD study output files from the study/<study_name>/trial_outputs directory.
     Files must follow the indexed naming scheme:
