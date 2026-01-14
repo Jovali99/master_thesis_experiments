@@ -1,4 +1,4 @@
-#from LeakPro.leakpro.attacks.mia_attacks.lira import lira_vectorized
+from LeakPro.leakpro.attacks.mia_attacks.lira import lira_vectorized
 from sklearn.metrics import roc_curve
 from torch.utils.data import Dataset, DataLoader, Subset
 from tqdm import tqdm
@@ -202,6 +202,41 @@ def calculate_roc(scores: np.ndarray, target_inmask: np.ndarray, clip: bool = Fa
         tpr_curve = np.clip(tpr_curve, eps, 1.0)
         
     return tpr_curve, fpr_curve
+
+def calculate_group_roc(
+    scores_list: list[np.ndarray],
+    inmask_list: list[np.ndarray],
+    fpr_grid: np.ndarray = None,
+    clip: bool = True,
+    eps: float = 1e-6,
+):
+    """
+    Compute mean ROC curve over multiple models.
+
+    Each element in scores_list and inmask_list corresponds to one model.
+    """
+
+    assert len(scores_list) == len(inmask_list)
+
+    if fpr_grid is None:
+        fpr_grid = np.logspace(-5, 0, 300)
+
+    tpr_interp_all = []
+
+    for scores, inmask in zip(scores_list, inmask_list):
+        tpr, fpr = calculate_roc(scores, inmask, clip=clip, eps=eps)
+
+        # Ensure monotonicity for interpolation
+        fpr_unique, idx = np.unique(fpr, return_index=True)
+        tpr_unique = tpr[idx]
+
+        tpr_interp = np.interp(fpr_grid, fpr_unique, tpr_unique)
+        tpr_interp_all.append(tpr_interp)
+
+    tpr_mean = np.mean(tpr_interp_all, axis=0)
+    tpr_std  = np.std(tpr_interp_all, axis=0)
+
+    return fpr_grid, tpr_mean, tpr_std
 
 def calculate_tpr_at_fpr(tpr_curve, fpr_curve, fpr: float = 1.0):
     """
