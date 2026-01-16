@@ -1,9 +1,10 @@
 fbd_study: # Configuration for training
   target_folder: "mlp3-purchase100-1594b978b1"
-  trials: 1000
+  trials: 50
   shadow_model_count: 256
   privacy_onion: False
   noise_injection: False
+  strict_fbd: True
   root: ./study
 
 data: # Configuration for data

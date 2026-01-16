@@ -165,10 +165,14 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
         noise_std = trial.suggest_categorical("noise_std", levels)
         centrality = 1.0
         temperature = 0.0
-    else:
-        noise_std = trial.suggest_float("noise_std", 0.0, 5e-2, step=0.005)
+    elif cfg['fbd_study']["strict_fbd"]:
+        noise_std = trial.suggest_float("noise_std", 0.0, 0.025, step=0.005)
         centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
-        temperature = trial.suggest_float("temperature", 0.0, 5e-1, step=0.05)
+        temperature = trial.suggest_float("temperature", 0.0, 0.25, step=0.05)
+    else:
+        noise_std = trial.suggest_float("noise_std", 0.0, 0.05, step=0.005)
+        centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
+        temperature = trial.suggest_float("temperature", 0.0, 0.5, step=0.05)
 
     # Calculate the weights
     weights = sigmoid_weigths(rmia_scores, centrality, temperature)
