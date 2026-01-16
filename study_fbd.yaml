@@ -1,6 +1,6 @@
 fbd_study: # Configuration for training
-  target_folder: "mlp3-purchase100-1594b978b1"
-  trials: 50
+  target_folder: "resnet-cinic10-c51d329813"
+  trials: 100
   shadow_model_count: 256
   privacy_onion: False
   noise_injection: False
@@ -8,7 +8,7 @@ fbd_study: # Configuration for training
   root: ./study
 
 data: # Configuration for data
-  dataset: purchase100 # String indicates the name of the dataset
+  dataset: cinic10 # String indicates the name of the dataset
   f_train: 0.5 # Float number from 0 to 1 indicating the fraction of the train dataset
   f_test: 0.5 # Float number from 0 to 1 indicating the size of the test set
   root: ./data # String about where to save the data.

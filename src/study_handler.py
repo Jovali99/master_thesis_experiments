@@ -167,8 +167,9 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
         temperature = 0.0
     elif cfg['fbd_study']["strict_fbd"]:
         noise_std = trial.suggest_float("noise_std", 0.0, 0.025, step=0.005)
-        centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
+        centrality = trial.suggest_categorical("centrality", [0.0, 0.2, 0.45, 0.7, 0.9])
         temperature = trial.suggest_float("temperature", 0.0, 0.25, step=0.05)
+        print("Strict FbD running")
     else:
         noise_std = trial.suggest_float("noise_std", 0.0, 0.05, step=0.005)
         centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
