@@ -157,10 +157,12 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
     """
     # ------------ study params setup ------------
     if cfg['fbd_study']["privacy_onion"]:
+        print("privacy_onion running")
         noise_std = 0.0
         centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.05)
         temperature = 0.0
     elif cfg['fbd_study']["noise_injection"]:
+        print("noise_injection running")
         levels = [10, 0.07, 0.05, 0.04, 0.03, 0.02, 0.01, 0.005, 0.003, 0.001, 0.0005, 0.0001]
         noise_std = trial.suggest_categorical("noise_std", levels)
         centrality = 1.0
@@ -171,6 +173,7 @@ def fbd_objective(trial, cfg, rmia_scores, train_dataset, test_dataset, shadow_g
         temperature = trial.suggest_float("temperature", 0.0, 0.25, step=0.05)
         print("Strict FbD running")
     else:
+        print("Standard FbD running")
         noise_std = trial.suggest_float("noise_std", 0.0, 0.05, step=0.005)
         centrality = trial.suggest_float("centrality", 0.0, 1.0, step=0.1)
         temperature = trial.suggest_float("temperature", 0.0, 0.5, step=0.05)

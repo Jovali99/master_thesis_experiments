@@ -442,8 +442,7 @@ def loadFbdStudy(study_name: str, metadata: bool = True, gtl: bool = True, logit
     else:
         global_metadata = None
 
-    meta_files = sorted(f for f in os.listdir(meta_dir) if f.startswith("metadata_") and f.endswith(".json"))
-    meta_indices = [int(f.split("_")[1].split(".")[0]) for f in meta_files]
+    meta_indices = sorted(int(f.split("_")[1].split(".")[0]) for f in os.listdir(meta_dir) if f.startswith("metadata_") and f.endswith(".json"))
 
     fbd_trial_results = []
     gtl_list = []
